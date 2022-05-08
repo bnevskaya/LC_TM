@@ -1,0 +1,597 @@
+# get red of warnings
+from IPython.display import HTML
+HTML('''<script>
+var code_show_err = false; 
+var code_toggle_err = function() {
+ var stderrNodes = document.querySelectorAll('[data-mime-type="application/vnd.jupyter.stderr"]')
+ var stderr = Array.from(stderrNodes)
+ if (code_show_err){
+     stderr.forEach(ele => ele.style.display = 'block');
+ } else {
+     stderr.forEach(ele => ele.style.display = 'none');
+ }
+ code_show_err = !code_show_err
+} 
+document.addEventListener('DOMContentLoaded', code_toggle_err);
+</script>
+To toggle on/off output_stderr, click <a onclick="javascript:code_toggle_err()">here</a>.''')
+
+# !pip install --user gensim==3.8.3
+# !pip install nltk
+# !pip install pyLDAvis==3.3.1
+# !pip install texttable
+
+# import modules
+import os  # files PC
+import re  # RE
+import nltk
+from nltk.stem import WordNetLemmatizer #  Lemmatisation
+import pickle  # Save and load
+import gensim  # TM library
+from gensim import corpora
+from gensim.models import CoherenceModel
+# import pyLDAvis
+import pyLDAvis.gensim_models
+pyLDAvis.enable_notebook() # visualisation
+# data and visualisation
+import pandas as pd
+import  matplotlib.pyplot  as  plt 
+import  numpy  as  np
+from multiprocessing import cpu_count
+import warnings
+
+warnings.filterwarnings("ignore")  # ignore warnings
+
+# jupyter notebook --NotebookApp.iopub_data_rate_limit=100000000000
+# $ jupyter notebook --generate-config
+
+# nltk.download('wordnet')
+
+# all files in one list
+dr = r'philosophy_all/'
+list_of_files = os.listdir(dr)
+all_philosophy_dataset = []
+i = 1
+
+for file in list_of_files:
+    i += 1
+    with open(dr+file, encoding='utf-8') as f:
+        philosophy_dataset = f.read().split('#n')
+        all_philosophy_dataset += philosophy_dataset
+
+# cleaning with stop words    
+stop_words_english = r'.\stopwords\stopwords_eng.txt'
+
+
+with open(stop_words_english, encoding='utf-8') as c:
+    stop_words_english = c.readlines()
+    stop_words_english = [re.sub('\s+', ' ', sent) for sent in stop_words_english]
+    stop_words_english = [re.sub(" ", "", sent) for sent in stop_words_english]
+
+# lemmatisation
+stemmer = WordNetLemmatizer()
+
+def preprocess_text(document):
+        # delete special symbols
+        document = re.sub(r'\W', ' ', str(document))
+        
+        # delete niumbers
+        document = re.sub(r'\d+', '', str(document))
+        
+        # delete _
+        document = re.sub(r'_', '', str(document))
+
+        # delete single characters
+        document = re.sub(r'\s+[a-zA-Z]\s+', ' ', document)
+
+        # delete single characters in the beginning
+        document = re.sub(r'\^[a-zA-Z]\s+', ' ', document)
+
+        # one space
+        document = re.sub(r'\s+', ' ', document, flags=re.I)
+
+        # delete prefix 'b'
+        document = re.sub(r'^b\s+', '', document)
+
+        # lower case
+        document = document.lower()
+
+        # lemmatisation
+        tokens = document.split()
+        tokens = [stemmer.lemmatize(word) for word in tokens]
+        tokens = [word for word in tokens if word not in stop_words_english]
+        tokens = [word for word in tokens if len(word)  > 5]
+
+        return tokens
+
+# cleaning and lemmatisation. One list
+processed_data = []
+
+
+for doc in all_philosophy_dataset:
+    tokens = preprocess_text(doc)
+    processed_data.append(tokens)
+
+# Creating dictionary and bag of words
+gensim_dictionary = corpora.Dictionary(processed_data)
+gensim_corpus = [gensim_dictionary.doc2bow(token, allow_update=True) for token in processed_data]
+
+# saving dictionary and corpus with pickle. Later we'll use it to make forecasts with new data 
+pickle.dump(gensim_corpus, open('gensim_corpus_corpus.pkl', 'wb'))
+gensim_dictionary.save('gensim_dictionary.gensim')
+
+# Creating LDA model 
+lda_model = gensim.models.ldamodel.LdaModel(gensim_corpus, num_topics=10, id2word=gensim_dictionary, passes=20)
+lda_model.save('gensim_model.gensim')
+
+# Visualisation. File - vis.html
+gensim_dictionary = gensim.corpora.Dictionary.load('gensim_dictionary.gensim')
+gensim_corpus = pickle.load(open('gensim_corpus_corpus.pkl', 'rb'))
+lda_model = gensim.models.ldamodel.LdaModel.load('gensim_model.gensim')
+
+
+lda_visualization = pyLDAvis.gensim_models.prepare(lda_model, gensim_corpus, gensim_dictionary, sort_topics=False)
+pyLDAvis.display(lda_visualization)
+pyLDAvis.save_html(lda_visualization,'vis.html')
+
+
+
+# Divide all texts by philosophical movements 
+dr_Existentialism = r'./philosophy_themes/Existentialism_/'
+dr_Futurism = r'./philosophy_themes/Futurism/'
+dr_Materialism_Marxism = r'./philosophy_themes/Materialism_Marxism/'
+dr_Positivism = r'./philosophy_themes/Positivism_/'
+dr_Pragmatism = r'./philosophy_themes/Pragmatism/'
+dr_Transcendental_idealism_neo_kantianism = r'./philosophy_themes/Transcendental idealism _neo-kantianism/'
+dr_Transcendentalism = r'./philosophy_themes/Transcendentalism_/'
+dr_Utilitarianism = r'./philosophy_themes/Utilitarianism/'
+
+
+list_of_files_Existentialism = os.listdir(dr_Existentialism)
+list_of_files_Futurism = os.listdir(dr_Futurism)
+list_of_files_Materialism_Marxism = os.listdir(dr_Materialism_Marxism)
+list_of_files_Positivism = os.listdir(dr_Positivism)
+list_of_files_Pragmatism = os.listdir(dr_Pragmatism)
+list_of_files_Transcendental_idealism_neo_kantianism = os.listdir(dr_Transcendental_idealism_neo_kantianism)
+list_of_files_Transcendentalism = os.listdir(dr_Transcendentalism)
+list_of_files_Utilitarianism = os.listdir(dr_Utilitarianism)
+
+
+dataset_Existentialism = []
+dataset_Futurism = []
+dataset_Materialism_Marxism = []
+dataset_Positivism = []
+dataset_Pragmatism = []
+dataset_Transcendental_idealism_neo_kantianism = []
+dataset_Transcendentalism = []
+dataset_Utilitarianism = []
+
+
+for file in list_of_files_Existentialism:
+    with open(dr_Existentialism+file, encoding='utf-8') as f:
+        philosophy_dataset = f.read().split('#n')
+        dataset_Existentialism += philosophy_dataset
+        
+for file in list_of_files_Futurism:
+    with open(dr_Futurism+file, encoding='utf-8') as f:
+        philosophy_dataset = f.read().split('#n')
+        dataset_Futurism += philosophy_dataset
+        
+for file in list_of_files_Materialism_Marxism:
+    with open(dr_Materialism_Marxism+file, encoding='utf-8') as f:
+        philosophy_dataset = f.read().split('#n')
+        dataset_Materialism_Marxism += philosophy_dataset
+        
+for file in list_of_files_Positivism:
+    with open(dr_Positivism+file, encoding='utf-8') as f:
+        philosophy_dataset = f.read().split('#n')
+        dataset_Positivism += philosophy_dataset
+        
+for file in list_of_files_Pragmatism:
+    with open(dr_Pragmatism+file, encoding='utf-8') as f:
+        philosophy_dataset = f.read().split('#n')
+        dataset_Pragmatism += philosophy_dataset
+        
+for file in list_of_files_Transcendental_idealism_neo_kantianism:
+    with open(dr_Transcendental_idealism_neo_kantianism+file, encoding='utf-8') as f:
+        philosophy_dataset = f.read().split('#n')
+        dataset_Transcendental_idealism_neo_kantianism += philosophy_dataset
+        
+for file in list_of_files_Transcendentalism:
+    with open(dr_Transcendentalism+file, encoding='utf-8') as f:
+        philosophy_dataset = f.read().split('#n')
+        dataset_Transcendentalism += philosophy_dataset
+        
+for file in list_of_files_Utilitarianism:
+    with open(dr_Utilitarianism+file, encoding='utf-8') as f:
+        philosophy_dataset = f.read().split('#n')
+        dataset_Utilitarianism += philosophy_dataset
+#         print(type(dataset_Utilitarianism))
+
+
+# Cleaning with stop words  
+stop_words_english = r'.\stopwords\stopwords_eng.txt'
+
+
+with open(stop_words_english, encoding='utf-8') as c:
+    stop_words_english = c.readlines()
+    stop_words_english = [re.sub('\s+', ' ', sent) for sent in stop_words_english]
+    stop_words_english = [re.sub(" ", "", sent) for sent in stop_words_english]
+
+# Open file le_corbusier.txt
+path_le_corbusier = r'.\le corbusier\Le Corbusier, ENG Vers une architecture.txt'
+
+with open(path_le_corbusier, encoding='utf-8') as f:
+    le_corbusier_dataset = f.read().split('#n')
+
+# lemmatisation
+stemmer = WordNetLemmatizer()
+
+def preprocess_text_en(document):
+        # delete special symbols
+        document = re.sub(r'\W', ' ', str(document))
+        
+        # delete numbers
+        document = re.sub(r'\d+', '', str(document))
+        
+        # delete _
+        document = re.sub(r'_', '', str(document))
+
+        # delete single characters
+        document = re.sub(r'\s+[a-zA-Z]\s+', ' ', document)
+
+        # delete single characters in the beginning
+        document = re.sub(r'\^[a-zA-Z]\s+', ' ', document)
+
+        # single space
+        document = re.sub(r'\s+', ' ', document, flags=re.I)
+
+        # delete prefix 'b'
+        document = re.sub(r'^b\s+', '', document)
+
+        # lower case
+        document = document.lower()
+
+        # lemmatisation
+        tokens = document.split()
+        tokens = [stemmer.lemmatize(word) for word in tokens]
+        tokens = [word for word in tokens if word not in stop_words_english]
+        tokens = [word for word in tokens if len(word)  > 5]
+
+        return tokens
+
+# cleaniung and lemmatisation. One list
+processed_data_le_corbusier = []
+tokens = preprocess_text_en(le_corbusier_dataset)
+processed_data_le_corbusier.append(tokens)
+
+
+processed_data_Existentialism = []
+for doc in dataset_Existentialism:
+    tokens = preprocess_text_en(doc)
+    processed_data_Existentialism.append(tokens)
+print(processed_data_Existentialism[0:2])
+    
+processed_data_Futurism = []
+for doc in dataset_Futurism:
+    tokens = preprocess_text_en(doc)
+    processed_data_Futurism.append(tokens)
+    
+processed_data_Materialism_Marxism = []
+for doc in dataset_Materialism_Marxism:
+    tokens = preprocess_text_en(doc)
+    processed_data_Materialism_Marxism.append(tokens)
+    
+processed_data_Positivism = []
+for doc in dataset_Positivism:
+    tokens = preprocess_text_en(doc)
+    processed_data_Positivism.append(tokens)
+        
+processed_data_Pragmatism = []
+for doc in dataset_Pragmatism:
+    tokens = preprocess_text_en(doc)
+    processed_data_Pragmatism.append(tokens)
+        
+processed_data_Transcendental_idealism_neo_kantianism = []
+for doc in dataset_Transcendental_idealism_neo_kantianism:
+    tokens = preprocess_text_en(doc)
+    processed_data_Transcendental_idealism_neo_kantianism.append(tokens)
+        
+processed_data_Transcendentalism = []
+for doc in dataset_Transcendentalism:
+    tokens = preprocess_text_en(doc)
+    processed_data_Transcendentalism.append(tokens)
+        
+processed_data_Utilitarianism = []
+for doc in dataset_Utilitarianism:
+    tokens = preprocess_text_en(doc)
+    processed_data_Utilitarianism.append(tokens) 
+    
+# print(type(processed_data_Existentialism))
+# print(len(processed_data_Existentialism))
+# print(processed_data_Existentialism)
+
+# Dictionary and bag of words
+gensim_dictionary_le_corbusier = corpora.Dictionary(processed_data_le_corbusier)
+gensim_corpus_le_corbusier = [gensim_dictionary_le_corbusier.doc2bow(token, allow_update=True) for token in processed_data_le_corbusier]
+
+
+gensim_dictionary_Existentialism = corpora.Dictionary(processed_data_Existentialism)
+gensim_corpus_Existentialism = [gensim_dictionary_Existentialism.doc2bow(token, allow_update=True) for token in processed_data_Existentialism]
+
+gensim_dictionary_Futurism = corpora.Dictionary(processed_data_Futurism)
+gensim_corpus_Futurism = [gensim_dictionary_Futurism.doc2bow(token, allow_update=True) for token in processed_data_Futurism]
+
+gensim_dictionary_Materialism_Marxism = corpora.Dictionary(processed_data_Materialism_Marxism)
+gensim_corpus_Materialism_Marxism = [gensim_dictionary_Materialism_Marxism.doc2bow(token, allow_update=True) for token in processed_data_Materialism_Marxism]
+
+gensim_dictionary_Positivism = corpora.Dictionary(processed_data_Positivism)
+gensim_corpus_Positivism = [gensim_dictionary_Positivism.doc2bow(token, allow_update=True) for token in processed_data_Positivism]
+
+gensim_dictionary_Pragmatism = corpora.Dictionary(processed_data_Pragmatism)
+gensim_corpus_Pragmatism = [gensim_dictionary_Pragmatism.doc2bow(token, allow_update=True) for token in processed_data_Pragmatism]
+
+gensim_dictionary_Transcendental_idealism_neo_kantianism = corpora.Dictionary(processed_data_Transcendental_idealism_neo_kantianism)
+gensim_corpus_Transcendental_idealism_neo_kantianism = [gensim_dictionary_Transcendental_idealism_neo_kantianism.doc2bow(token, allow_update=True) for token in processed_data_Transcendental_idealism_neo_kantianism]
+
+gensim_dictionary_Transcendentalism = corpora.Dictionary(processed_data_Transcendentalism)
+gensim_corpus_Transcendentalism = [gensim_dictionary_Transcendentalism.doc2bow(token, allow_update=True) for token in processed_data_Transcendentalism]
+
+gensim_dictionary_Utilitarianism = corpora.Dictionary(processed_data_Utilitarianism)
+gensim_corpus_Utilitarianism = [gensim_dictionary_Utilitarianism.doc2bow(token, allow_update=True) for token in processed_data_Utilitarianism]
+
+# print(1, gensim_dictionary_Existentialism)
+# print(2, type(gensim_corpus_Existentialism))
+# print(3, gensim_corpus_Utilitarianism)
+# print(4, type(gensim_corpus_Utilitarianism))
+
+
+# creating LDA model 
+lda_model_le_corbusier = gensim.models.ldamodel.LdaModel(gensim_corpus_le_corbusier, num_topics=1, id2word=gensim_dictionary_le_corbusier, passes=20)
+lda_model_Existentialism = gensim.models.ldamodel.LdaModel(gensim_corpus_Existentialism, num_topics=1, id2word=gensim_dictionary_Existentialism, passes=20)
+lda_model_Futurism = gensim.models.ldamodel.LdaModel(gensim_corpus_Futurism, num_topics=1, id2word=gensim_dictionary_Futurism, passes=20)
+lda_model_Materialism_Marxism = gensim.models.ldamodel.LdaModel(gensim_corpus_Materialism_Marxism, num_topics=1, id2word=gensim_dictionary_Materialism_Marxism, passes=20)
+lda_model_Positivism = gensim.models.ldamodel.LdaModel(gensim_corpus_Positivism, num_topics=1, id2word=gensim_dictionary_Positivism, passes=20)
+lda_model_Pragmatism = gensim.models.ldamodel.LdaModel(gensim_corpus_Pragmatism, num_topics=1, id2word=gensim_dictionary_Pragmatism, passes=20)
+lda_model_Transcendental_idealism_neo_kantianism = gensim.models.ldamodel.LdaModel(gensim_corpus_Transcendental_idealism_neo_kantianism, num_topics=1, id2word=gensim_dictionary_Transcendental_idealism_neo_kantianism, passes=20)
+lda_model_Transcendentalism = gensim.models.ldamodel.LdaModel(gensim_corpus_Transcendentalism, num_topics=1, id2word=gensim_dictionary_Transcendentalism, passes=20)
+lda_model_Utilitarianism = gensim.models.ldamodel.LdaModel(gensim_corpus_Utilitarianism, num_topics=1, id2word=gensim_dictionary_Utilitarianism, passes=20)
+# print(type(lda_model_Utilitarianism))
+# print(lda_model_Utilitarianism)
+
+# topics_le_corbusier = lda_model_le_corbusier.print_topics(num_words=10)
+# print(topics_le_corbusier[0][1])
+
+# import libraries
+import pandas as pd
+import os
+import  matplotlib.pyplot  as  plt 
+import  numpy  as  np
+
+# Dataframes with 100 words of each corpus 
+lst_of_df = []
+lst1 = []
+lst2_le = []
+topics_le_corbusier = lda_model_le_corbusier.print_topics(num_words=100)
+for k, v in topics_le_corbusier:
+    for i in v.split('+'):
+        lst1.append(i.split('*')[0])
+        lst2_le.append(i.split('*')[1].replace('"',''))
+
+topics_list_of_le_corbusier = {'le_corbusier':lst1}
+le_corbusier_table_topics = pd.DataFrame(topics_list_of_le_corbusier, index=lst2_le).T
+# print(le_corbusier_table_topics)
+lst_of_df.append(le_corbusier_table_topics)
+
+lst1 = []
+lst2 = []
+topics_Existentialism = lda_model_Existentialism.print_topics(num_words=100)
+for k, v in topics_Existentialism:
+    for i in v.split('+'):
+        lst1.append(i.split('*')[0])
+        lst2.append(i.split('*')[1].replace('"',''))
+
+topics_list_of_Existentialism = {'Existentialism':lst1}
+# print(topics_list_of_Existentialism)
+Existentialism_table_topics = pd.DataFrame(topics_list_of_Existentialism, index=lst2).T
+# print(Existentialism_table_topics)
+lst_of_df.append(Existentialism_table_topics)
+
+lst1 = []
+lst2 = []
+topics_Futurism = lda_model_Futurism.print_topics(num_words=100)
+for k, v in topics_Futurism:
+    for i in v.split('+'):
+        lst1.append(i.split('*')[0])
+        lst2.append(i.split('*')[1].replace('"',''))
+
+topics_list_of_Futurism = {'Futurism':lst1}
+Futurism_table_topics = pd.DataFrame(topics_list_of_Futurism, index=lst2).T
+# print(Futurism_table_topics)
+lst_of_df.append(Futurism_table_topics)
+
+lst1 = []
+lst2 = []
+topics_Materialism_Marxism = lda_model_Materialism_Marxism.print_topics(num_words=100)
+for k, v in topics_Materialism_Marxism:
+    for i in v.split('+'):
+        lst1.append(i.split('*')[0])
+        lst2.append(i.split('*')[1].replace('"',''))
+
+topics_list_of_Materialism_Marxism = {'Materialism_Marxism':lst1}
+Materialism_Marxism_table_topics = pd.DataFrame(topics_list_of_Materialism_Marxism, index=lst2).T
+# print(Materialism_Marxism_table_topics)
+lst_of_df.append(Materialism_Marxism_table_topics)
+
+lst1 = []
+lst2 = []
+topics_Positivism = lda_model_Positivism.print_topics(num_words=100)
+for k, v in topics_Positivism:
+    for i in v.split('+'):
+        lst1.append(i.split('*')[0])
+        lst2.append(i.split('*')[1].replace('"',''))
+
+topics_list_of_Positivism = {'Positivism':lst1}
+Positivism_table_topics = pd.DataFrame(topics_list_of_Positivism, index=lst2).T
+# print(Positivism_table_topics)
+lst_of_df.append(Positivism_table_topics)
+
+lst1 = []
+lst2 = []
+topics_Pragmatism = lda_model_Pragmatism.print_topics(num_words=100)
+for k, v in topics_Pragmatism:
+    for i in v.split('+'):
+        lst1.append(i.split('*')[0])
+        lst2.append(i.split('*')[1].replace('"',''))
+
+topics_list_of_Pragmatism = {'Pragmatism':lst1}
+Pragmatism_table_topics = pd.DataFrame(topics_list_of_Pragmatism, index=lst2).T
+# print(Pragmatism_table_topics)
+lst_of_df.append(Pragmatism_table_topics)
+
+lst1 = []
+lst2 = []
+topics_Transcendental_idealism_neo_kantianism = lda_model_Transcendental_idealism_neo_kantianism.print_topics(num_words=100)
+for k, v in topics_Transcendental_idealism_neo_kantianism:
+    for i in v.split('+'):
+        lst1.append(i.split('*')[0])
+        lst2.append(i.split('*')[1].replace('"',''))
+
+topics_list_of_Transcendental_idealism_neo_kantianism = {'Transcendental_idealism_neo_kantianism':lst1}
+Transcendental_idealism_neo_kantianism_table_topics = pd.DataFrame(topics_list_of_Transcendental_idealism_neo_kantianism, index=lst2).T
+# print(Transcendental_idealism_neo_kantianism_table_topics)
+lst_of_df.append(Transcendental_idealism_neo_kantianism_table_topics)
+
+lst1 = []
+lst2 = []
+topics_Transcendentalism = lda_model_Transcendentalism.print_topics(num_words=100)
+for k, v in topics_Transcendentalism:
+    for i in v.split('+'):
+        lst1.append(i.split('*')[0])
+        lst2.append(i.split('*')[1].replace('"',''))
+
+topics_list_of_Transcendentalism = {'Transcendentalism':lst1}
+Transcendentalism_table_topics = pd.DataFrame(topics_list_of_Transcendentalism, index=lst2).T
+# print(Transcendentalism_table_topics)
+lst_of_df.append(Transcendentalism_table_topics)
+
+lst1 = []
+lst2 = []
+topics_Utilitarianism = lda_model_Utilitarianism.print_topics(num_words=100)
+for k, v in topics_Utilitarianism:
+    for i in v.split('+'):
+        lst1.append(i.split('*')[0])
+        lst2.append(i.split('*')[1].replace('"',''))
+
+topics_list_of_Utilitarianism = {'Utilitarianism':lst1}
+Utilitarianism_table_topics = pd.DataFrame(topics_list_of_Utilitarianism, index=lst2).T
+# print(Utilitarianism_table_topics)
+lst_of_df.append(Utilitarianism_table_topics)
+
+all_df = pd.DataFrame()
+
+for df in lst_of_df:
+    all_df = pd.concat([all_df, df])
+    
+all_df = all_df[lst2_le]
+all_df = all_df.dropna(axis=1, thresh=2)
+
+all_df.to_excel(r'./table.xlsx')
+
+
+
+
+
+# Model Word2Vec
+# from gensim.models.word2vec import Word2Vec
+# documents = [processed_data_le_corbusier, processed_data_Existentialism, processed_data_Futurism, 
+#              processed_data_Materialism_Marxism, processed_data_Positivism, processed_data_Transcendental_idealism_neo_kantianism,
+#              processed_data_Transcendentalism, processed_data_Utilitarianism,
+#              dataset_Utilitarianism]
+# Word2Vec_model = Word2Vec(documents[0], min_count = 0, workers=cpu_count())
+# print(Word2Vec_model)
+# print(type(Word2Vec_model))
+# # Word2Vec_model.most_similar('architecture')
+
+# Model Doc2Vec
+def create_tagged_document(list_of_list_of_words):
+    for i, list_of_words in enumerate(list_of_list_of_words):
+        yield gensim.models.doc2vec.TaggedDocument(list_of_words, [i])
+
+documents_philosophy = [processed_data_Existentialism, processed_data_Futurism, 
+             processed_data_Materialism_Marxism, processed_data_Positivism, processed_data_Pragmatism, processed_data_Transcendental_idealism_neo_kantianism,
+             processed_data_Transcendentalism, processed_data_Utilitarianism]     
+
+        
+train_data = list(create_tagged_document(documents_philosophy[0]))
+
+Doc2Vec_model = gensim.models.doc2vec.Doc2Vec(vector_size=50, min_count=2, epochs=40)
+# Build the Volabulary
+Doc2Vec_model.build_vocab(train_data)
+# Train the Doc2Vec model
+Doc2Vec_model.train(train_data, total_examples=Doc2Vec_model.corpus_count, epochs=Doc2Vec_model.epochs)
+
+# Cosine distance le_corbusier and others, making dataframes 
+from gensim.matutils import softcossim
+
+documents_le_corbusier = processed_data_le_corbusier
+dictionary_le = corpora.Dictionary(documents_le_corbusier)
+
+similarity_matrix = Doc2Vec_model.wv.similarity_matrix(dictionary_le, tfidf=None, threshold=0.0, exponent=2.0, nonzero_limit=100)
+sent_le = dictionary_le.doc2bow(processed_data_le_corbusier[0])
+
+lst_1 = []
+lst_2 = []
+
+
+sent_philosophy = dictionary_le.doc2bow(processed_data_Existentialism[0]) 
+lst_1.append('Existentialism')
+lst_2.append(softcossim(sent_le, sent_philosophy, similarity_matrix))
+
+sent_philosophy = dictionary_le.doc2bow(processed_data_Futurism[0]) 
+lst_1.append('Futurism')
+lst_2.append(softcossim(sent_le, sent_philosophy, similarity_matrix))
+
+sent_philosophy = dictionary_le.doc2bow(processed_data_Materialism_Marxism[0]) 
+lst_1.append('Materialism_Marxism')
+lst_2.append(softcossim(sent_le, sent_philosophy, similarity_matrix))
+
+sent_philosophy = dictionary_le.doc2bow(processed_data_Positivism[0]) 
+lst_1.append('Positivism')
+lst_2.append(softcossim(sent_le, sent_philosophy, similarity_matrix))
+
+sent_philosophy = dictionary_le.doc2bow(processed_data_Pragmatism[0]) 
+lst_1.append('Pragmatism')
+lst_2.append(softcossim(sent_le, sent_philosophy, similarity_matrix))
+
+sent_philosophy = dictionary_le.doc2bow(processed_data_Transcendental_idealism_neo_kantianism[0]) 
+lst_1.append('Transcendental_idealism_neo_kantianism')
+lst_2.append(softcossim(sent_le, sent_philosophy, similarity_matrix))
+
+sent_philosophy = dictionary_le.doc2bow(processed_data_Transcendentalism[0]) 
+lst_1.append('Transcendentalism')
+lst_2.append(softcossim(sent_le, sent_philosophy, similarity_matrix))
+
+sent_philosophy = dictionary_le.doc2bow(processed_data_Utilitarianism[0]) 
+lst_1.append('Utilitarianism')
+lst_2.append(softcossim(sent_le, sent_philosophy, similarity_matrix))
+
+
+# print(lst_1)
+# print(lst_2)
+
+df_cosine_distance = pd.DataFrame({'cosine_distance':lst_2}, index=lst_1)
+df_cosine_distance.to_excel(r'./cosine_distance.xlsx', index=False)
+# for documents in documents_philosophy:
+#     sent_philosophy = dictionary_le.doc2bow(documents[0])
+#     print(softcossim(sent_le, sent_philosophy, similarity_matrix))
+
+# visualisation
+import seaborn as sns
+%matplotlib inline
+
+# Index= ['aaa', 'bbb', 'ccc', 'ddd', 'eee']
+# Cols = ['A', 'B', 'C', 'D']
+# df = DataFrame(abs(np.random.randn(5, 4)), index=Index, columns=Cols)
+
+sns.heatmap(df_cosine_distance, annot=True)
