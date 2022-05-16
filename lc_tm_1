@@ -590,6 +590,7 @@ df_cosine_distance.to_excel(r'./cosine_distance.xlsx', index=False)
 import seaborn as sns
 %matplotlib inline
 
+
 # Index= ['aaa', 'bbb', 'ccc', 'ddd', 'eee']
 # Cols = ['A', 'B', 'C', 'D']
 # df = DataFrame(abs(np.random.randn(5, 4)), index=Index, columns=Cols)
